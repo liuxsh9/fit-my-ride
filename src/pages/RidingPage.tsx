@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useCameraContext } from '../context/CameraContext'
 import { usePoseContext } from '../context/PoseContext'
 import { useAngleCalculator, type AccumulatedAngles } from '../hooks/useAngleCalculator'
+import { useVoiceFeedback } from '../hooks/useVoiceFeedback'
 import SkeletonOverlay from '../components/SkeletonOverlay'
 import MetricsPanel from '../components/MetricsPanel'
 
@@ -13,6 +14,7 @@ export default function RidingPage({ onStop }: Props) {
   const { videoRef, stream } = useCameraContext()
   const { processFrame, results } = usePoseContext()
   const { angles, accumulated, processResults, reset } = useAngleCalculator()
+  const { update: updateVoice, speechAvailable } = useVoiceFeedback()
   const animRef = useRef<number>(0)
   const startTimeRef = useRef(Date.now())
 
@@ -30,6 +32,10 @@ export default function RidingPage({ onStop }: Props) {
   useEffect(() => {
     if (results) processResults(results)
   }, [results, processResults])
+
+  useEffect(() => {
+    updateVoice(angles)
+  }, [angles, updateVoice])
 
   // Render loop
   const renderLoop = useCallback(() => {
@@ -93,6 +99,11 @@ export default function RidingPage({ onStop }: Props) {
       {/* Right: metrics */}
       <div style={{ flex: 1, background: '#111', minWidth: 220, maxWidth: 300 }}>
         <MetricsPanel angles={angles} />
+        {!speechAvailable && (
+          <div style={{ padding: '8px 16px', color: '#888', fontSize: 12 }}>
+            🔇 语音不可用
+          </div>
+        )}
       </div>
     </div>
   )
