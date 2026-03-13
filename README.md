@@ -1,73 +1,65 @@
-# React + TypeScript + Vite
+# Fit My Ride — 自行车 Fitting 分析工具
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> 用笔记本摄像头，在家完成公路车 fitting 校准。
 
-Currently, two official plugins are available:
+**本地运行：**
+```bash
+npm install && npm run dev
+```
+用 Chrome 或 Edge 打开 `http://localhost:5173`
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 功能
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+实时检测三项关键 fitting 指标，超出目标范围时语音提示，骑行结束后给出综合评分和调整建议。
 
-## Expanding the ESLint configuration
+| 指标 | 测量方法 | 目标范围 |
+|------|----------|----------|
+| 膝盖伸展角度 | 踩踏最低点（BDC）处，髋→膝→踝夹角 | 140° – 150° |
+| 躯干前倾角度 | 肩关节中点→髋关节中点，相对竖直方向 | 35° – 45° |
+| 手肘弯曲角度 | 肩→肘→腕夹角 | 150° – 165° |
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 使用方法
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+1. **设置** — 授权摄像头，将摄像头放在骑行方向的**正侧面**，距离约 2-3 米，高度与腰部齐平，等待 AI 模型加载完成
+2. **校准** — 骑上车，保持骑行姿态约 2 秒，系统自动检测稳定后进入分析
+3. **骑行** — 左侧实时画面 + 彩色骨架叠加，右侧三项指标卡片；角度偏出范围时骨架线变红，语音提示调整
+4. **总结** — 按 `ESC` 或 `空格` 结束，查看平均角度、综合评分和调整建议
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 技术栈
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- **前端框架**：Vite 5 + React 18 + TypeScript
+- **姿势检测**：[MediaPipe Tasks Vision](https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker) — PoseLandmarker lite 模型，纯浏览器 WASM 推理，目标 30fps
+- **画面叠加**：Canvas API
+- **语音反馈**：Web Speech API（SpeechSynthesis，中文）
+- **数据持久化**：localStorage（最多保存 20 条历史记录）
+- **测试**：Vitest + React Testing Library（52 个测试）
+
+## 反馈逻辑
+
+- **视觉**：骨架连线颜色 — 绿色（正常）/ 黄色（偏离 ≤ 5°）/ 红色（偏离 > 5°）
+- **语音**：偏离超过 3 秒触发播报，同一指标 30 秒内不重复；优先级：膝盖 > 躯干 > 手肘
+- **评分**：`max(0, 100 − |偏离中点| / 半范围 × 100)`，三项加权平均（膝盖 50%、躯干 30%、手肘 20%）
+
+## 浏览器支持
+
+| 浏览器 | 支持情况 |
+|--------|----------|
+| Chrome / Edge | ✅ 完整功能（含语音） |
+| Firefox / Safari | ❌ WebAssembly SIMD 支持不稳定，显示不兼容提示 |
+
+## 本地开发
+
+```bash
+npm install
+npm run dev      # 开发服务器 http://localhost:5173
+npm run test     # 运行测试（watch 模式）
+npm run build    # 生产构建
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> 摄像头放置要点：从**侧面**（90° 侧视角）拍摄，摄像头尽量调平，否则躯干角度计算会有偏差。
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## 隐私说明
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+所有处理均在本地浏览器内完成，视频画面和分析数据**不会上传**到任何服务器。历史记录保存在浏览器 localStorage，清除浏览器数据即可删除。
