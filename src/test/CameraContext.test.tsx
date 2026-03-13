@@ -2,8 +2,6 @@ import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { CameraProvider, useCameraContext } from '../context/CameraContext'
 
-const mockStream = { getTracks: () => [{ stop: vi.fn() }] } as unknown as MediaStream
-
 function TestConsumer() {
   const { error, stream } = useCameraContext()
   return <div>{error ? `error:${error}` : stream ? 'has-stream' : 'no-stream'}</div>

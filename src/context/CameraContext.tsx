@@ -1,9 +1,9 @@
-import { createContext, useContext, useRef, useState, useCallback, useEffect, ReactNode } from 'react'
-import type { RefObject } from 'react'
+import { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react'
+import type { ReactNode, RefObject } from 'react'
 
 interface CameraContextValue {
   stream: MediaStream | null
-  videoRef: RefObject<HTMLVideoElement>
+  videoRef: RefObject<HTMLVideoElement | null>
   availableDevices: MediaDeviceInfo[]
   selectedDeviceId: string | null
   setSelectedDeviceId: (id: string) => void

@@ -137,7 +137,7 @@ describe('isPostureStable', () => {
       lm(0.3 + i * 0.01, 0.5, 0.9),
       lm(0.3, 0.6, 0.9),
       lm(0.3, 0.7, 0.9),
-    ])
+    ]) as Array<[ReturnType<typeof lm>, ReturnType<typeof lm>, ReturnType<typeof lm>]>
     expect(isPostureStable(history)).toBe(false)
   })
 })

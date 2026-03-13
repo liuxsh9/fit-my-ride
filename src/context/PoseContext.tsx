@@ -1,6 +1,7 @@
 import {
-  createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode
+  createContext, useContext, useEffect, useRef, useState, useCallback
 } from 'react'
+import type { ReactNode } from 'react'
 import {
   PoseLandmarker,
   FilesetResolver,
@@ -40,7 +41,7 @@ export function PoseProvider({ children }: { children: ReactNode }) {
           runningMode: 'VIDEO',
           numPoses: 1,
           minPoseDetectionConfidence: 0.5,
-          minPosePresenceScore: 0.5,
+          minPosePresenceConfidence: 0.5,
           minTrackingConfidence: 0.5,
         })
         if (!cancelled) {

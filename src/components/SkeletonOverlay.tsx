@@ -3,7 +3,7 @@ import { type PoseLandmarkerResult } from '@mediapipe/tasks-vision'
 import { type AngleState } from '../hooks/useAngleCalculator'
 
 interface Props {
-  videoRef: React.RefObject<HTMLVideoElement>
+  videoRef: React.RefObject<HTMLVideoElement | null>
   results: PoseLandmarkerResult | null
   angles: AngleState
 }
