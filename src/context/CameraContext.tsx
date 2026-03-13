@@ -48,11 +48,6 @@ export function CameraProvider({ children }: { children: ReactNode }) {
       selectedDeviceId, setSelectedDeviceId,
       error, requestCamera,
     }}>
-      {error && (
-        <span role="alert" aria-live="assertive" data-testid="camera-error">
-          error:{error}
-        </span>
-      )}
       {children}
     </CameraContext.Provider>
   )

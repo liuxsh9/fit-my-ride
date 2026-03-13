@@ -27,7 +27,12 @@ describe('CameraContext', () => {
       ctx = useCameraContext()
       return null
     }
-    render(<CameraProvider><Capture /></CameraProvider>)
+    render(
+      <CameraProvider>
+        <Capture />
+        <TestConsumer />
+      </CameraProvider>
+    )
     await act(async () => { await ctx!.requestCamera() })
     expect(screen.queryByText(/error/)).toBeTruthy()
     vi.unstubAllGlobals()
