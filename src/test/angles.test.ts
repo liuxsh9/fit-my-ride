@@ -24,6 +24,10 @@ describe('calcAngle', () => {
     const angle = calcAngle({ x: 0, y: 0 }, { x: 0, y: 1 }, { x: 0, y: 0.5 })
     expect(angle).toBeCloseTo(0, 1)
   })
+  it('returns 0 when p1 === p2 (zero magnitude)', () => {
+    const angle = calcAngle({ x: 1, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 2 })
+    expect(angle).toBe(0)
+  })
 })
 
 describe('calcKneeAngle', () => {
@@ -36,6 +40,15 @@ describe('calcKneeAngle', () => {
     lms[23] = lm(0.4, 0.3, 0.9) // left hip
     lms[25] = lm(0.4, 0.5, 0.9) // left knee
     lms[27] = lm(0.4, 0.7, 0.9) // left ankle — straight line → ~180°
+    const result = calcKneeAngle(lms)
+    expect(result).not.toBeNull()
+    expect(result!).toBeCloseTo(180, 5)
+  })
+  it('uses right landmarks when right side has higher visibility', () => {
+    const lms = Array(33).fill(null).map(() => lm(0.5, 0.5, 0.3))
+    lms[24] = lm(0.6, 0.3, 0.9) // right hip
+    lms[26] = lm(0.6, 0.5, 0.9) // right knee
+    lms[28] = lm(0.6, 0.7, 0.9) // right ankle — straight line → ~180°
     const result = calcKneeAngle(lms)
     expect(result).not.toBeNull()
     expect(result!).toBeCloseTo(180, 5)
@@ -63,6 +76,14 @@ describe('calcTorsoAngle', () => {
     const lms = Array(33).fill(null).map(() => lm(0.5, 0.5, 0.3))
     expect(calcTorsoAngle(lms)).toBeNull()
   })
+  it('returns null when hip landmarks are low-confidence but shoulders are fine', () => {
+    const lms = Array(33).fill(null).map(() => lm(0.5, 0.5, 0.9))
+    lms[11] = lm(0.5, 0.2, 0.9) // shoulder — high confidence
+    lms[12] = lm(0.5, 0.2, 0.9) // shoulder — high confidence
+    lms[23] = lm(0.5, 0.6, 0.3) // hip — low confidence
+    lms[24] = lm(0.5, 0.6, 0.3) // hip — low confidence
+    expect(calcTorsoAngle(lms)).toBeNull()
+  })
 })
 
 describe('calcElbowAngle', () => {
@@ -78,6 +99,10 @@ describe('calcElbowAngle', () => {
     const result = calcElbowAngle(lms)
     expect(result).not.toBeNull()
     expect(result!).toBeCloseTo(180, 5)
+  })
+  it('returns null when landmark array is too short', () => {
+    const lms = Array(10).fill(null).map(() => lm(0.5, 0.5, 0.9))
+    expect(calcElbowAngle(lms)).toBeNull()
   })
 })
 

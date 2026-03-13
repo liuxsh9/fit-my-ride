@@ -13,6 +13,7 @@ export function calcAngle(p1: Point, p2: Point, p3: Point): number {
 const CONFIDENCE_THRESHOLD = 0.5
 
 export function calcKneeAngle(landmarks: Landmark[]): number | null {
+  if (landmarks.length < 29) return null
   const leftVis = Math.min(landmarks[23].visibility, landmarks[25].visibility, landmarks[27].visibility)
   const rightVis = Math.min(landmarks[24].visibility, landmarks[26].visibility, landmarks[28].visibility)
   if (leftVis < CONFIDENCE_THRESHOLD && rightVis < CONFIDENCE_THRESHOLD) return null
@@ -23,6 +24,7 @@ export function calcKneeAngle(landmarks: Landmark[]): number | null {
 }
 
 export function calcTorsoAngle(landmarks: Landmark[]): number | null {
+  if (landmarks.length < 29) return null
   const shoulderVis = Math.min(landmarks[11].visibility, landmarks[12].visibility)
   const hipVis = Math.min(landmarks[23].visibility, landmarks[24].visibility)
   if (shoulderVis < CONFIDENCE_THRESHOLD || hipVis < CONFIDENCE_THRESHOLD) return null
@@ -30,10 +32,13 @@ export function calcTorsoAngle(landmarks: Landmark[]): number | null {
   const hipMid = { x: (landmarks[23].x + landmarks[24].x) / 2, y: (landmarks[23].y + landmarks[24].y) / 2 }
   const dx = shoulderMid.x - hipMid.x
   const dy = shoulderMid.y - hipMid.y
+  // Use Math.abs on both components to fold forward and backward lean into the same
+  // magnitude — we care about the degree of lean, not its direction.
   return (Math.atan2(Math.abs(dx), Math.abs(dy)) * 180) / Math.PI
 }
 
 export function calcElbowAngle(landmarks: Landmark[]): number | null {
+  if (landmarks.length < 29) return null
   const leftVis = Math.min(landmarks[11].visibility, landmarks[13].visibility, landmarks[15].visibility)
   const rightVis = Math.min(landmarks[12].visibility, landmarks[14].visibility, landmarks[16].visibility)
   if (leftVis < CONFIDENCE_THRESHOLD && rightVis < CONFIDENCE_THRESHOLD) return null
