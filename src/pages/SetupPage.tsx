@@ -9,7 +9,7 @@ interface Props {
 
 export default function SetupPage({ onReady }: Props) {
   const { stream, error: camError, requestCamera, availableDevices, selectedDeviceId, setSelectedDeviceId, videoRef } = useCameraContext()
-  const { isLoading: modelLoading, loadError: modelError, processFrame, results } = usePoseContext()
+  const { isLoading: modelLoading, loadError: modelError, processFrame, results, resultsRef } = usePoseContext()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef<number>(0)
 
@@ -21,17 +21,20 @@ export default function SetupPage({ onReady }: Props) {
 
   // Attach stream to video element
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream
-      videoRef.current.play()
-    }
+    const video = videoRef.current
+    if (!video || !stream) return
+    video.muted = true  // React's muted JSX prop is unreliable; set imperatively
+    video.srcObject = stream
+    video.play().catch(err => console.error('[SetupPage] video.play() rejected:', err))
   }, [stream, videoRef])
 
   // Render loop: process frames and draw skeleton dots
+  // NOTE: resultsRef (not results state) used here so this callback is stable —
+  // putting results state in deps would restart the rAF loop on every single frame.
   const renderLoop = useCallback(() => {
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas || video.paused || video.ended) {
+    if (!video || !canvas || video.readyState < 2 || video.paused || video.ended) {
       animRef.current = requestAnimationFrame(renderLoop)
       return
     }
@@ -42,11 +45,12 @@ export default function SetupPage({ onReady }: Props) {
     canvas.height = video.videoHeight
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    if (results?.landmarks?.[0]) {
-      drawPoseSkeleton(ctx, canvas, results.landmarks[0])
+    const lms = resultsRef.current?.landmarks?.[0]
+    if (lms) {
+      drawPoseSkeleton(ctx, canvas, lms)
     }
     animRef.current = requestAnimationFrame(renderLoop)
-  }, [videoRef, processFrame, results])
+  }, [videoRef, processFrame, resultsRef])
 
   useEffect(() => {
     if (!stream) return

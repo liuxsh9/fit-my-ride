@@ -10,10 +10,13 @@ interface Props {
 
 export default function CalibrationPage({ onReady }: Props) {
   const { videoRef, stream } = useCameraContext()
-  const { processFrame, results } = usePoseContext()
+  const { processFrame, results, resultsRef } = usePoseContext()
   const { isStable, hasDetected, showSkip, processResults } = useCalibration(onReady)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef<number>(0)
+  // Keep refs in sync so the rAF loop reads current values without being in deps
+  const isStableRef = useRef(false)
+  isStableRef.current = isStable
 
   // Process results whenever they change
   useEffect(() => {
@@ -21,10 +24,11 @@ export default function CalibrationPage({ onReady }: Props) {
   }, [results, processResults])
 
   // Render loop: feed video frames to MediaPipe, draw dots on canvas
+  // Uses resultsRef/isStableRef (not state) so the loop is stable and never restarts mid-stream.
   const renderLoop = useCallback(() => {
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas || video.paused || video.ended) {
+    if (!video || !canvas || video.readyState < 2 || video.paused || video.ended) {
       animRef.current = requestAnimationFrame(renderLoop)
       return
     }
@@ -35,8 +39,8 @@ export default function CalibrationPage({ onReady }: Props) {
     canvas.height = video.videoHeight
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    if (results?.landmarks?.[0]) {
-      const lms = results.landmarks[0]
+    const lms = resultsRef.current?.landmarks?.[0]
+    if (lms) {
       // Draw horizontal reference line at hip height (only when hips are visible)
       const hipL = lms[23], hipR = lms[24]
       if (hipL?.visibility > 0.3 || hipR?.visibility > 0.3) {
@@ -50,11 +54,10 @@ export default function CalibrationPage({ onReady }: Props) {
         ctx.stroke()
         ctx.setLineDash([])
       }
-
-      drawPoseSkeleton(ctx, canvas, lms, isStable ? '#4caf50' : '#4fc3f7')
+      drawPoseSkeleton(ctx, canvas, lms, isStableRef.current ? '#4caf50' : '#4fc3f7')
     }
     animRef.current = requestAnimationFrame(renderLoop)
-  }, [videoRef, processFrame, results, isStable])
+  }, [videoRef, processFrame, resultsRef])
 
   useEffect(() => {
     animRef.current = requestAnimationFrame(renderLoop)
@@ -63,10 +66,11 @@ export default function CalibrationPage({ onReady }: Props) {
 
   // Set video source when stream available
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream
-      videoRef.current.play()
-    }
+    const video = videoRef.current
+    if (!video || !stream) return
+    video.muted = true  // React's muted JSX prop is unreliable; set imperatively
+    video.srcObject = stream
+    video.play().catch(err => console.error('[CalibrationPage] video.play() rejected:', err))
   }, [stream, videoRef])
 
   return (

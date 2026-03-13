@@ -1,7 +1,7 @@
 import {
   createContext, useContext, useEffect, useRef, useState, useCallback
 } from 'react'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import {
   PoseLandmarker,
   FilesetResolver,
@@ -11,6 +11,7 @@ import {
 interface PoseContextValue {
   landmarker: PoseLandmarker | null
   results: PoseLandmarkerResult | null
+  resultsRef: RefObject<PoseLandmarkerResult | null>
   isLoading: boolean
   loadError: string | null
   processFrame: (video: HTMLVideoElement) => void
@@ -21,6 +22,7 @@ const PoseContext = createContext<PoseContextValue | null>(null)
 export function PoseProvider({ children }: { children: ReactNode }) {
   const [landmarker, setLandmarker] = useState<PoseLandmarker | null>(null)
   const [results, setResults] = useState<PoseLandmarkerResult | null>(null)
+  const resultsRef = useRef<PoseLandmarkerResult | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const lastVideoTime = useRef(-1)
@@ -68,11 +70,12 @@ export function PoseProvider({ children }: { children: ReactNode }) {
     if (!landmarker || video.currentTime === lastVideoTime.current) return
     lastVideoTime.current = video.currentTime
     const res = landmarker.detectForVideo(video, performance.now())
-    setResults(res)
+    resultsRef.current = res  // sync — available immediately in rAF callbacks
+    setResults(res)           // async — triggers React re-renders
   }, [landmarker])
 
   return (
-    <PoseContext.Provider value={{ landmarker, results, isLoading, loadError, processFrame }}>
+    <PoseContext.Provider value={{ landmarker, results, resultsRef, isLoading, loadError, processFrame }}>
       {children}
     </PoseContext.Provider>
   )
