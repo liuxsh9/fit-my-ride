@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useCameraContext } from '../context/CameraContext'
 import { usePoseContext } from '../context/PoseContext'
 
@@ -69,7 +68,8 @@ export default function SetupPage({ onReady }: Props) {
         <h2 style={styles.cardTitle}>🧠 AI 模型</h2>
         {modelLoading ? (
           <div>
-            <div style={styles.progressBar}><div style={{ ...styles.progressFill, width: '60%' }} /></div>
+            <style>{`@keyframes shimmer { 0%{width:0%} 50%{width:80%} 100%{width:0%;margin-left:100%} }`}</style>
+            <div style={styles.progressBar}><div style={{ ...styles.progressFill, animation: 'shimmer 1.5s ease-in-out infinite' }} /></div>
             <p style={styles.hint}>正在加载姿态检测模型（约 6MB）…</p>
           </div>
         ) : modelError ? (
