@@ -76,7 +76,11 @@ export default function CalibrationPage({ onReady }: Props) {
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>姿态校准</h1>
       <p style={{ color: '#888', marginBottom: 16 }}>
-        请骑上自行车，保持骑行姿态。系统检测到稳定骑行姿势后将自动进入分析界面。
+        {!hasDetected
+          ? '请站在摄像头前，确保全身入镜。'
+          : !isStable
+          ? '检测到您了！请骑上自行车，保持骑行姿态静止约 2 秒，系统将自动进入分析。'
+          : '姿态稳定，即将开始分析…'}
       </p>
 
       <div style={{ position: 'relative', background: '#000', borderRadius: 12, overflow: 'hidden' }}>
@@ -88,10 +92,10 @@ export default function CalibrationPage({ onReady }: Props) {
           position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
           background: 'rgba(0,0,0,0.7)', borderRadius: 8, padding: '8px 16px', textAlign: 'center',
         }}>
-          {!hasDetected && <p style={{ margin: 0, color: '#ffa' }}>⌛ 等待检测到人体…</p>}
+          {!hasDetected && <p style={{ margin: 0, color: '#ffa' }}>⌛ 等待检测到人体，请站入画面…</p>}
           {hasDetected && !isStable && (
             <p style={{ margin: 0, color: '#4fc3f7' }}>
-              🔄 检测中，请保持骑行姿态静止约 2 秒…
+              🚴 请骑上自行车，保持静止约 2 秒…
             </p>
           )}
           {isStable && <p style={{ margin: 0, color: '#4caf50', fontWeight: 600 }}>✅ 姿态稳定！即将开始分析…</p>}
@@ -101,6 +105,12 @@ export default function CalibrationPage({ onReady }: Props) {
       {!hasDetected && (
         <div style={{ marginTop: 12, padding: 12, background: '#1a1a2e', borderRadius: 8, fontSize: 13, color: '#aaa' }}>
           💡 提示：请确保身体完整入镜，光线充足，摄像头从侧面拍摄
+        </div>
+      )}
+
+      {hasDetected && !isStable && (
+        <div style={{ marginTop: 12, padding: 12, background: '#1a2e1a', borderRadius: 8, fontSize: 13, color: '#aaa' }}>
+          💡 骑上车后，双手握把，踩到最低点，保持 2 秒不动即可完成校准
         </div>
       )}
 

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useCallback } from 'react'
 import { useCameraContext } from '../context/CameraContext'
 import { usePoseContext } from '../context/PoseContext'
 
@@ -6,10 +7,71 @@ interface Props {
 }
 
 export default function SetupPage({ onReady }: Props) {
-  const { stream, error: camError, requestCamera, availableDevices, selectedDeviceId, setSelectedDeviceId } = useCameraContext()
-  const { isLoading: modelLoading, loadError: modelError } = usePoseContext()
+  const { stream, error: camError, requestCamera, availableDevices, selectedDeviceId, setSelectedDeviceId, videoRef } = useCameraContext()
+  const { isLoading: modelLoading, loadError: modelError, processFrame, results } = usePoseContext()
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const animRef = useRef<number>(0)
 
   const canProceed = !!stream && !modelLoading && !modelError
+  const hasDetected = !!(results?.landmarks?.[0])
+
+  // Attach stream to video element
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream
+      videoRef.current.play()
+    }
+  }, [stream, videoRef])
+
+  // Render loop: process frames and draw skeleton dots
+  const renderLoop = useCallback(() => {
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas || video.paused || video.ended) {
+      animRef.current = requestAnimationFrame(renderLoop)
+      return
+    }
+    processFrame(video)
+
+    const ctx = canvas.getContext('2d')!
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    if (results?.landmarks?.[0]) {
+      const lms = results.landmarks[0]
+      // Draw connections
+      const CONNECTIONS: [number, number][] = [
+        [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
+        [11, 23], [12, 24], [23, 24],
+        [23, 25], [25, 27], [24, 26], [26, 28],
+      ]
+      ctx.lineWidth = 2
+      ctx.strokeStyle = 'rgba(79,195,247,0.7)'
+      CONNECTIONS.forEach(([a, b]) => {
+        const la = lms[a], lb = lms[b]
+        if (la.visibility < 0.5 || lb.visibility < 0.5) return
+        ctx.beginPath()
+        ctx.moveTo(la.x * canvas.width, la.y * canvas.height)
+        ctx.lineTo(lb.x * canvas.width, lb.y * canvas.height)
+        ctx.stroke()
+      })
+      lms.forEach(lm => {
+        if (lm.visibility < 0.5) return
+        ctx.beginPath()
+        ctx.arc(lm.x * canvas.width, lm.y * canvas.height, 4, 0, Math.PI * 2)
+        ctx.fillStyle = '#4fc3f7'
+        ctx.fill()
+      })
+    }
+    animRef.current = requestAnimationFrame(renderLoop)
+  }, [videoRef, processFrame, results])
+
+  useEffect(() => {
+    if (!stream) return
+    animRef.current = requestAnimationFrame(renderLoop)
+    return () => cancelAnimationFrame(animRef.current)
+  }, [renderLoop, stream])
 
   return (
     <div style={styles.container}>
@@ -63,6 +125,26 @@ export default function SetupPage({ onReady }: Props) {
         )}
       </div>
 
+      {/* Live pose preview — only shown after camera is authorized */}
+      {stream && (
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>🦴 姿态检测预览</h2>
+          <p style={styles.hint}>请站在摄像头前，确保全身入镜，确认骨骼检测正常后再进入校准。</p>
+          <div style={{ position: 'relative', background: '#000', borderRadius: 8, overflow: 'hidden', marginTop: 8 }}>
+            <video ref={videoRef} muted playsInline style={{ width: '100%', display: 'block' }} />
+            <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
+            <div style={{
+              position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+              background: 'rgba(0,0,0,0.75)', borderRadius: 6, padding: '4px 12px',
+              fontSize: 13, whiteSpace: 'nowrap',
+              color: hasDetected ? '#4caf50' : '#ffeb3b',
+            }}>
+              {hasDetected ? '✅ 检测到人体姿态' : '⌛ 等待检测人体，请站入画面…'}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Model loading */}
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>🧠 AI 模型</h2>
@@ -84,7 +166,7 @@ export default function SetupPage({ onReady }: Props) {
         disabled={!canProceed}
         onClick={onReady}
       >
-        开始校准 →
+        {hasDetected ? '✅ 姿态检测正常，开始校准 →' : '开始校准 →'}
       </button>
     </div>
   )
