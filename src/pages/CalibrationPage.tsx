@@ -8,23 +8,25 @@ interface Props {
   onReady: () => void
 }
 
+const STEPS = ['站入画面', '骑上自行车', '保持静止']
+
 export default function CalibrationPage({ onReady }: Props) {
   const { videoRef, stream } = useCameraContext()
   const { processFrame, results, resultsRef } = usePoseContext()
   const { isStable, hasDetected, showSkip, processResults } = useCalibration(onReady)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animRef = useRef<number>(0)
-  // Keep refs in sync so the rAF loop reads current values without being in deps
   const isStableRef = useRef(false)
   isStableRef.current = isStable
 
-  // Process results whenever they change
+  const stepIndex = !hasDetected ? 0 : !isStable ? 1 : 2
+
+  // Process results for calibration logic
   useEffect(() => {
     if (results) processResults(results)
   }, [results, processResults])
 
-  // Render loop: feed video frames to MediaPipe, draw dots on canvas
-  // Uses resultsRef/isStableRef (not state) so the loop is stable and never restarts mid-stream.
+  // Stable render loop
   const renderLoop = useCallback(() => {
     const video = videoRef.current
     const canvas = canvasRef.current
@@ -41,13 +43,12 @@ export default function CalibrationPage({ onReady }: Props) {
 
     const lms = resultsRef.current?.landmarks?.[0]
     if (lms) {
-      // Draw horizontal reference line at hip height (only when hips are visible)
       const hipL = lms[23], hipR = lms[24]
       if (hipL?.visibility > 0.3 || hipR?.visibility > 0.3) {
         const hipY = ((hipL.y + hipR.y) / 2) * canvas.height
-        ctx.strokeStyle = 'rgba(100,100,255,0.5)'
+        ctx.strokeStyle = 'rgba(100,100,255,0.4)'
         ctx.lineWidth = 1
-        ctx.setLineDash([5, 5])
+        ctx.setLineDash([6, 6])
         ctx.beginPath()
         ctx.moveTo(0, hipY)
         ctx.lineTo(canvas.width, hipY)
@@ -64,67 +65,99 @@ export default function CalibrationPage({ onReady }: Props) {
     return () => cancelAnimationFrame(animRef.current)
   }, [renderLoop])
 
-  // Set video source when stream available
   useEffect(() => {
     const video = videoRef.current
     if (!video || !stream) return
-    video.muted = true  // React's muted JSX prop is unreliable; set imperatively
+    video.muted = true
     video.srcObject = stream
     video.play().catch(err => console.error('[CalibrationPage] video.play() rejected:', err))
   }, [stream, videoRef])
 
+  const statusMsg = !hasDetected
+    ? '请站在摄像头侧面，确保全身入镜'
+    : !isStable
+    ? '检测到了！请骑上自行车，保持静止约 2 秒'
+    : '✅ 姿态稳定，即将开始分析…'
+
+  const statusColor = !hasDetected ? '#ffc107' : !isStable ? '#4fc3f7' : '#4caf50'
+
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
-      <h1 style={{ fontSize: 22, marginBottom: 8 }}>姿态校准</h1>
-      <p style={{ color: '#888', marginBottom: 16 }}>
-        {!hasDetected
-          ? '请站在摄像头前，确保全身入镜。'
-          : !isStable
-          ? '检测到您了！请骑上自行车，保持骑行姿态静止约 2 秒，系统将自动进入分析。'
-          : '姿态稳定，即将开始分析…'}
-      </p>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#080808', overflow: 'hidden' }}>
 
-      <div style={{ position: 'relative', background: '#000', borderRadius: 12, overflow: 'hidden' }}>
-        <video ref={videoRef} muted playsInline style={{ width: '100%', display: 'block' }} />
-        <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
-
-        {/* Status overlay */}
-        <div style={{
-          position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
-          background: 'rgba(0,0,0,0.7)', borderRadius: 8, padding: '8px 16px', textAlign: 'center',
-        }}>
-          {!hasDetected && <p style={{ margin: 0, color: '#ffa' }}>⌛ 等待检测到人体，请站入画面…</p>}
-          {hasDetected && !isStable && (
-            <p style={{ margin: 0, color: '#4fc3f7' }}>
-              🚴 请骑上自行车，保持静止约 2 秒…
-            </p>
-          )}
-          {isStable && <p style={{ margin: 0, color: '#4caf50', fontWeight: 600 }}>✅ 姿态稳定！即将开始分析…</p>}
+      {/* Step indicator */}
+      <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0 }}>
+        <span style={{ fontSize: 15, color: '#666', marginRight: 16 }}>姿态校准</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flex: 1 }}>
+          {STEPS.map((step, i) => (
+            <div key={step} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  background: i < stepIndex ? '#4caf50' : i === stepIndex ? '#4fc3f7' : '#222',
+                  border: `2px solid ${i < stepIndex ? '#4caf50' : i === stepIndex ? '#4fc3f7' : '#333'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700,
+                  color: i <= stepIndex ? '#000' : '#555',
+                }}>
+                  {i < stepIndex ? '✓' : i + 1}
+                </div>
+                <span style={{
+                  fontSize: 13,
+                  color: i < stepIndex ? '#4caf50' : i === stepIndex ? '#fff' : '#555',
+                  whiteSpace: 'nowrap',
+                }}>{step}</span>
+              </div>
+              {i < STEPS.length - 1 && (
+                <div style={{
+                  flex: 1, height: 2, margin: '0 8px',
+                  background: i < stepIndex ? '#4caf50' : '#222',
+                }} />
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
-      {!hasDetected && (
-        <div style={{ marginTop: 12, padding: 12, background: '#1a1a2e', borderRadius: 8, fontSize: 13, color: '#aaa' }}>
-          💡 提示：请确保身体完整入镜，光线充足，摄像头从侧面拍摄
+      {/* Video — takes remaining space */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+        {/* Mirror wrapper */}
+        <div style={{ transform: 'scaleX(-1)', width: '100%', height: '100%', position: 'relative' }}>
+          <video ref={videoRef} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#000' }} />
+          <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
         </div>
-      )}
 
-      {hasDetected && !isStable && (
-        <div style={{ marginTop: 12, padding: 12, background: '#1a2e1a', borderRadius: 8, fontSize: 13, color: '#aaa' }}>
-          💡 骑上车后，双手握把，踩到最低点，保持 2 秒不动即可完成校准
+        {/* Status message overlay */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          background: 'linear-gradient(transparent, rgba(0,0,0,0.85))',
+          padding: '48px 32px 24px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+        }}>
+          <p style={{ margin: 0, fontSize: 22, fontWeight: 600, color: statusColor, textAlign: 'center' }}>
+            {statusMsg}
+          </p>
+          {hasDetected && !isStable && (
+            <p style={{ margin: 0, fontSize: 14, color: '#888' }}>
+              双手握把，踩到最低点，保持不动
+            </p>
+          )}
         </div>
-      )}
+      </div>
 
+      {/* Bottom bar */}
       {showSkip && !isStable && (
-        <button
-          onClick={onReady}
-          style={{
-            marginTop: 16, width: '100%', background: '#333', color: '#fff',
-            border: 'none', borderRadius: 8, padding: '12px 20px', cursor: 'pointer', fontSize: 14,
-          }}
-        >
-          跳过校准，直接开始 →
-        </button>
+        <div style={{ padding: '12px 24px', flexShrink: 0, borderTop: '1px solid #1a1a1a' }}>
+          <button
+            onClick={onReady}
+            style={{
+              width: '100%', background: '#222', color: '#888',
+              border: '1px solid #333', borderRadius: 10, padding: '12px 20px',
+              cursor: 'pointer', fontSize: 14,
+            }}
+          >
+            跳过校准，直接开始 →
+          </button>
+        </div>
       )}
     </div>
   )
