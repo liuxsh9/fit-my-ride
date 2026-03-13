@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useRef, useState, useCallback, useEffect, ReactNode } from 'react'
 import type { RefObject } from 'react'
 
 interface CameraContextValue {
@@ -20,8 +20,24 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
 
+  useEffect(() => {
+    return () => {
+      stream?.getTracks().forEach(t => t.stop())
+    }
+  }, [stream])
+
   const requestCamera = useCallback(async () => {
     setError(null)
+    // Stop existing stream tracks before acquiring new one
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop())
+    }
+    // Always try to enumerate devices (labels available after first permission grant)
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      setAvailableDevices(devices.filter(d => d.kind === 'videoinput'))
+    } catch { /* ignore */ }
+
     try {
       const constraints: MediaStreamConstraints = {
         video: selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: 'user' },
@@ -32,15 +48,13 @@ export function CameraProvider({ children }: { children: ReactNode }) {
         videoRef.current.srcObject = s
         await videoRef.current.play()
       }
-      const devices = await navigator.mediaDevices.enumerateDevices()
-      setAvailableDevices(devices.filter(d => d.kind === 'videoinput'))
     } catch (e) {
       const msg = e instanceof DOMException && e.name === 'NotAllowedError'
         ? '摄像头权限被拒绝，请在浏览器设置中允许访问摄像头。'
         : '无法访问摄像头，请检查设备连接。'
       setError(msg)
     }
-  }, [selectedDeviceId])
+  }, [selectedDeviceId, stream])
 
   return (
     <CameraContext.Provider value={{

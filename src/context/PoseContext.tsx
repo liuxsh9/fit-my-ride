@@ -23,8 +23,10 @@ export function PoseProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const lastVideoTime = useRef(-1)
+  const landmarkerRef = useRef<PoseLandmarker | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     async function load() {
       try {
         const vision = await FilesetResolver.forVisionTasks(
@@ -41,14 +43,24 @@ export function PoseProvider({ children }: { children: ReactNode }) {
           minPosePresenceScore: 0.5,
           minTrackingConfidence: 0.5,
         })
-        setLandmarker(pl)
+        if (!cancelled) {
+          landmarkerRef.current = pl
+          setLandmarker(pl)
+        } else {
+          pl.close()
+        }
       } catch (e) {
-        setLoadError('MediaPipe 加载失败，请检查网络或使用 Chrome 浏览器。')
+        if (!cancelled) setLoadError('MediaPipe 加载失败，请检查网络或使用 Chrome 浏览器。')
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
     load()
+    return () => {
+      cancelled = true
+      landmarkerRef.current?.close()
+      landmarkerRef.current = null
+    }
   }, [])
 
   const processFrame = useCallback((video: HTMLVideoElement) => {
