@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useCameraContext } from '../context/CameraContext'
 import { usePoseContext } from '../context/PoseContext'
 import { useCalibration } from '../hooks/useCalibration'
+import { drawPoseSkeleton } from '../lib/poseRenderer'
 
 interface Props {
   onReady: () => void
@@ -36,25 +37,21 @@ export default function CalibrationPage({ onReady }: Props) {
 
     if (results?.landmarks?.[0]) {
       const lms = results.landmarks[0]
-      // Draw horizontal reference line at hip height
-      const hipY = ((lms[23].y + lms[24].y) / 2) * canvas.height
-      ctx.strokeStyle = 'rgba(100,100,255,0.5)'
-      ctx.lineWidth = 1
-      ctx.setLineDash([5, 5])
-      ctx.beginPath()
-      ctx.moveTo(0, hipY)
-      ctx.lineTo(canvas.width, hipY)
-      ctx.stroke()
-      ctx.setLineDash([])
-
-      // Draw landmark dots
-      lms.forEach(lm => {
-        if (lm.visibility < 0.5) return
+      // Draw horizontal reference line at hip height (only when hips are visible)
+      const hipL = lms[23], hipR = lms[24]
+      if (hipL?.visibility > 0.3 || hipR?.visibility > 0.3) {
+        const hipY = ((hipL.y + hipR.y) / 2) * canvas.height
+        ctx.strokeStyle = 'rgba(100,100,255,0.5)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([5, 5])
         ctx.beginPath()
-        ctx.arc(lm.x * canvas.width, lm.y * canvas.height, 5, 0, Math.PI * 2)
-        ctx.fillStyle = isStable ? '#4caf50' : '#4fc3f7'
-        ctx.fill()
-      })
+        ctx.moveTo(0, hipY)
+        ctx.lineTo(canvas.width, hipY)
+        ctx.stroke()
+        ctx.setLineDash([])
+      }
+
+      drawPoseSkeleton(ctx, canvas, lms, isStable ? '#4caf50' : '#4fc3f7')
     }
     animRef.current = requestAnimationFrame(renderLoop)
   }, [videoRef, processFrame, results, isStable])

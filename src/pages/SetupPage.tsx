@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useCameraContext } from '../context/CameraContext'
 import { usePoseContext } from '../context/PoseContext'
+import { drawPoseSkeleton, getBodyGroupStatus, getPoseGuidance } from '../lib/poseRenderer'
 
 interface Props {
   onReady: () => void
@@ -13,7 +14,10 @@ export default function SetupPage({ onReady }: Props) {
   const animRef = useRef<number>(0)
 
   const canProceed = !!stream && !modelLoading && !modelError
-  const hasDetected = !!(results?.landmarks?.[0])
+  const lms = results?.landmarks?.[0] ?? null
+  const hasDetected = !!lms
+  const bodyStatus = lms ? getBodyGroupStatus(lms) : null
+  const guidance = bodyStatus ? getPoseGuidance(bodyStatus) : null
 
   // Attach stream to video element
   useEffect(() => {
@@ -39,30 +43,7 @@ export default function SetupPage({ onReady }: Props) {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     if (results?.landmarks?.[0]) {
-      const lms = results.landmarks[0]
-      // Draw connections
-      const CONNECTIONS: [number, number][] = [
-        [11, 12], [11, 13], [13, 15], [12, 14], [14, 16],
-        [11, 23], [12, 24], [23, 24],
-        [23, 25], [25, 27], [24, 26], [26, 28],
-      ]
-      ctx.lineWidth = 2
-      ctx.strokeStyle = 'rgba(79,195,247,0.7)'
-      CONNECTIONS.forEach(([a, b]) => {
-        const la = lms[a], lb = lms[b]
-        if (la.visibility < 0.5 || lb.visibility < 0.5) return
-        ctx.beginPath()
-        ctx.moveTo(la.x * canvas.width, la.y * canvas.height)
-        ctx.lineTo(lb.x * canvas.width, lb.y * canvas.height)
-        ctx.stroke()
-      })
-      lms.forEach(lm => {
-        if (lm.visibility < 0.5) return
-        ctx.beginPath()
-        ctx.arc(lm.x * canvas.width, lm.y * canvas.height, 4, 0, Math.PI * 2)
-        ctx.fillStyle = '#4fc3f7'
-        ctx.fill()
-      })
+      drawPoseSkeleton(ctx, canvas, results.landmarks[0])
     }
     animRef.current = requestAnimationFrame(renderLoop)
   }, [videoRef, processFrame, results])
@@ -129,19 +110,44 @@ export default function SetupPage({ onReady }: Props) {
       {stream && (
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>🦴 姿态检测预览</h2>
-          <p style={styles.hint}>请站在摄像头前，确保全身入镜，确认骨骼检测正常后再进入校准。</p>
+          <p style={styles.hint}>站在摄像头前确认骨骼检测正常后，再进入校准。无需全身入镜，系统会显示已检测到的部位。</p>
           <div style={{ position: 'relative', background: '#000', borderRadius: 8, overflow: 'hidden', marginTop: 8 }}>
             <video ref={videoRef} muted playsInline style={{ width: '100%', display: 'block' }} />
             <canvas ref={canvasRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
-            <div style={{
-              position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
-              background: 'rgba(0,0,0,0.75)', borderRadius: 6, padding: '4px 12px',
-              fontSize: 13, whiteSpace: 'nowrap',
-              color: hasDetected ? '#4caf50' : '#ffeb3b',
-            }}>
-              {hasDetected ? '✅ 检测到人体姿态' : '⌛ 等待检测人体，请站入画面…'}
-            </div>
+            {!hasDetected && (
+              <div style={styles.videoBadge}>
+                <span style={{ color: '#ffeb3b' }}>⌛ 等待检测人体，请站入画面…</span>
+              </div>
+            )}
           </div>
+
+          {/* Body group status badges */}
+          {bodyStatus && (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {bodyStatus.map(s => (
+                  <span key={s.name} style={{
+                    fontSize: 12, padding: '3px 8px', borderRadius: 12,
+                    background: s.detected ? '#1a3d1a' : s.partial ? '#3d3a10' : '#2a1a1a',
+                    color: s.detected ? '#4caf50' : s.partial ? '#ffc107' : '#888',
+                    border: `1px solid ${s.detected ? '#4caf50' : s.partial ? '#ffc107' : '#444'}`,
+                  }}>
+                    {s.detected ? '✅' : s.partial ? '⚠️' : '○'} {s.name}
+                  </span>
+                ))}
+              </div>
+              {guidance && (
+                <p style={{ margin: '8px 0 0', fontSize: 13, color: '#ffc107' }}>
+                  💡 {guidance}
+                </p>
+              )}
+              {!guidance && hasDetected && (
+                <p style={{ margin: '8px 0 0', fontSize: 13, color: '#4caf50' }}>
+                  ✅ 关键关节均已检测到，可以开始校准
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -191,4 +197,9 @@ const styles: Record<string, React.CSSProperties> = {
   hint: { color: '#888', fontSize: 13, marginTop: 8 },
   progressBar: { background: '#333', borderRadius: 4, height: 8, overflow: 'hidden' },
   progressFill: { background: '#4fc3f7', height: '100%', borderRadius: 4, transition: 'width 0.3s' },
+  videoBadge: {
+    position: 'absolute' as const, bottom: 8, left: '50%', transform: 'translateX(-50%)',
+    background: 'rgba(0,0,0,0.75)', borderRadius: 6, padding: '4px 12px',
+    fontSize: 13, whiteSpace: 'nowrap' as const,
+  },
 }
