@@ -4,6 +4,7 @@ import { PoseProvider } from './context/PoseContext'
 import SetupPage from './pages/SetupPage'
 import CalibrationPage from './pages/CalibrationPage'
 import RidingPage from './pages/RidingPage'
+import SummaryPage from './pages/SummaryPage'
 import { type AccumulatedAngles } from './hooks/useAngleCalculator'
 
 export type Page = 'setup' | 'calibration' | 'riding' | 'summary'
@@ -24,12 +25,12 @@ export default function App() {
           {page === 'setup' && <SetupPage onReady={() => setPage('calibration')} />}
           {page === 'calibration' && <CalibrationPage onReady={() => setPage('riding')} />}
           {page === 'riding' && <RidingPage onStop={handleRidingStop} />}
-          {page === 'summary' && (
-            <div style={{ padding: 24 }}>
-              <p>Summary page coming soon</p>
-              <p>Duration: {sessionData.current?.duration}s</p>
-              <button type="button" onClick={() => setPage('setup')}>← Restart</button>
-            </div>
+          {page === 'summary' && sessionData.current && (
+            <SummaryPage
+              accumulated={sessionData.current.accumulated}
+              duration={sessionData.current.duration}
+              onRestart={() => setPage('setup')}
+            />
           )}
         </div>
       </PoseProvider>
