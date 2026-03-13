@@ -33,4 +33,7 @@ describe('calcSessionScore', () => {
     const score = calcSessionScore(null, 40, 157.5)
     expect(score).toBe(100)
   })
+  it('returns 0 when all angles are null', () => {
+    expect(calcSessionScore(null, null, null)).toBe(0)
+  })
 })

@@ -1,10 +1,11 @@
 export function calcMetricScore(angle: number, lowerBound: number, upperBound: number): number {
   const midpoint = (lowerBound + upperBound) / 2
   const halfRange = (upperBound - lowerBound) / 2
+  if (halfRange === 0) return angle === lowerBound ? 100 : 0
   return Math.max(0, 100 - (Math.abs(angle - midpoint) / halfRange) * 100)
 }
 
-const WEIGHTS = { knee: 0.5, torso: 0.3, elbow: 0.2 }
+const WEIGHTS = { knee: 0.5, torso: 0.3, elbow: 0.2 } as const
 
 export function calcSessionScore(
   avgKnee: number | null,
